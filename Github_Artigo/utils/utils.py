@@ -19,17 +19,18 @@ import tabulate
 import sklearn.metrics as SK
 from tensorflow.keras import backend as K
 from tensorflow.keras.losses import *
-
+import seaborn as sns
 class Commons():
     def __init__(self):
         pass
-    def load_dataset(self, dataset:pd.DataFrame, task_start:int=0, number_of_tasks:int=1) -> tuple:
+    def load_dataset(self, dataset:pd.DataFrame,smiles_col:str ,task_start:int=0, number_of_tasks:int=1) -> tuple:
         task_end = task_start + number_of_tasks
         
         df = pd.read_csv(dataset, sep=",", low_memory=False)
         y_train = np.array(df.iloc[:,task_start:task_end].values)
+        smiles = df[smiles_col].values
         print(f"Loaded dataset {dataset} with shape: {df.shape}")
-        return df,y_train
+        return df,y_train,smiles
     
     def calc_fp(self,smiles:list,fp_size:int, radius:int, feat:bool) -> np.ndarray:
         """
@@ -165,8 +166,12 @@ class Shap_Helper():
             return images
 
 class TS_Helper():
-    def __init__(self):
-        pass
+    def __init__(self,model_type:bool):
+        """If model_type is True, the model is a classification model, if False, the model is a regression model"""
+        self.model_type = model_type
+        if model_type==False:
+            self.THRESHOLD = None
+
     MISSING_LABEL_FLAG = -1
     BinaryCrossentropy = T.keras.losses.BinaryCrossentropy()
 
@@ -266,6 +271,7 @@ class TS_Helper():
         prediction_train = np.where(prediction_train > threshold, 1.0,0.0)
         predictions_df = pd.DataFrame(data={"pred":prediction_train[:,task],"y":y_data[:,task]},index=range(len(y_data)))
         predictions_df.dropna(inplace=True)
+        
         return predictions_df
 
     def calc_Statistics(self,TP:int,TN:int,FP:int,FN:int,prediction_df):
@@ -302,10 +308,44 @@ class TS_Helper():
         statistics = tabulate.tabulate([["MSE",MSE],["MAE",MAE],["R2",R2]],headers=["Statistic","Value"])
         return statistics,(MSE, MAE, R2)
 
-    def get_RegressionStats(self,model:T.keras.models.Sequential(),X_train:pd.DataFrame,y_train,X_test:pd.DataFrame,y_test,X_val:pd.DataFrame,y_val,task:int):
-        regression_prediction_train = pd.DataFrame(data={"pred":model.predict(X_train)[:,task],"y":y_train[:,task]},index=range(len(y_train))).dropna(inplace=True)
-        regression_prediction_val = pd.DataFrame(data={"pred":model.predict(X_val)[:,task],"y":y_val[:,task]},index=range(len(y_val))).dropna(inplace=True)
-        regression_prediction_test = pd.DataFrame(data={"pred":model.predict(X_test)[:,task],"y":y_test[:,task]},index=range(len(y_test))).dropna(inplace=True)
+    def plot_Regression(self,X_train,X_val,X_test):
+        """
+        prediction_df: dataframe with predictions and target values
+        """
+        #concat_df = pd.concat([X_train,X_val,X_test])
+
+        plt.scatter(X_train["pred"], X_train["y"], color='blue',marker="o", label='train')
+        #plt.plot(X_train["pred"], X_train["y"], color='blue')
+
+        # Plot the validation data
+        plt.scatter(X_val["pred"],X_val["y"], color='green', marker="o",label='validation')
+        #plt.plot(X_val["pred"],X_val["y"], color='green')
+
+        # Plot the test data
+        plt.scatter(X_test["pred"],X_test["y"], color='red', marker="o",label='test')
+        
+        #plt.plot(np.mean(concat_df["pred"]), color='purple', label='regression line')
+
+        # Add labels and legend to the plot
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        plt.legend()
+
+        # Show the plot
+        plt.show()
+
+    def plot_Classification(self,X_train,X_val,X_test):
+        """
+        prediction_df: dataframe with predictions and target values
+        """
+        self.plot_Regression(X_train,X_val,X_test)
+
+    def get_RegressionStats(self,model:T.keras.models.Sequential(),X_train,y_train,X_test,y_test,X_val,y_val,task:int):
+        regression_prediction_train = pd.DataFrame(data={"pred":model.predict(X_train)[:,task],"y":y_train[:,task]},index=range(len(y_train)))
+        regression_prediction_val = pd.DataFrame(data={"pred":model.predict(X_val)[:,task],"y":y_val[:,task]},index=range(len(y_val)))
+        regression_prediction_test = pd.DataFrame(data={"pred":model.predict(X_test)[:,task],"y":y_test[:,task]},index=range(len(y_test)))
+        
+        train_val_test = [regression_prediction_train,regression_prediction_val,regression_prediction_test]
         
         train_text = f"For Training in task {task} \n "
         train_statistics,_ = self.calc_RegressionStatistics(regression_prediction_train)
@@ -319,42 +359,46 @@ class TS_Helper():
         test_statistics,_ = self.calc_RegressionStatistics(regression_prediction_test)
         test_text += test_statistics
 
-        return train_text+"\n"+val_text+"\n"+test_text
+        return train_text+"\n"+val_text+"\n"+test_text,train_val_test
+    
+    def get_ClassificationStats(self,model:T.keras.models.Sequential(),X_train:pd.DataFrame,y_train,X_test:pd.DataFrame,y_test,X_val:pd.DataFrame,y_val,task:int,threshold:float):
+        classification_prediction_train = self.set_prediction_threshold(model, X_train, y_train, task, threshold)
+        classification_prediction_val = self.set_prediction_threshold(model, X_val, y_val, task, threshold)
+        classification_prediction_test = self.set_prediction_threshold(model, X_test, y_test, task, threshold)
+        
+        _, (TP, TN, FP, FN) = self.calc_confusion_matrix(classification_prediction_train)
+        _, (TP_val, TN_val, FP_val, FN_val) = self.calc_confusion_matrix(classification_prediction_val)
+        _, (TP_test, TN_test, FP_test, FN_test) = self.calc_confusion_matrix(classification_prediction_test)
 
-    def get_modelStats(self,model:T.keras.models.Sequential(),X_train:pd.DataFrame,y_train,X_test:pd.DataFrame,y_test,X_val:pd.DataFrame,y_val,tasks:int,threshold:float,regression:bool,classification:bool):
-        if classification is None and regression is None:
-            raise ValueError("Please specify if the model is a classification or regression model")
-        if classification and regression:
-            raise ValueError("Please specify if the model is a classification or regression model")
-        if classification:
+        train_val_test = [classification_prediction_train,classification_prediction_val,classification_prediction_test]
+        
+        train_text = f"For Training in task {task} \n "
+        train_statistics,_ = self.calc_Statistics(TP, TN, FP, FN, classification_prediction_train)
+        train_text += train_statistics
+
+        val_text = f"For Validation in task {task} \n "
+        val_statistics,_ = self.calc_Statistics(TP_val, TN_val, FP_val, FN_val, classification_prediction_val)
+        val_text += val_statistics
+        
+        test_text = f"For Testing in task {task} \n "
+        test_statistics,_ = self.calc_Statistics(TP_test, TN_test, FP_test, FN_test, classification_prediction_test)
+        test_text += test_statistics
+
+        return train_text+"\n"+val_text+"\n"+test_text,train_val_test
+    
+    def get_modelStats(self,model:T.keras.models.Sequential(),X_train,y_train,X_test,y_test,X_val,y_val,tasks:int,threshold:float=0.5):
+        if self.model_type:
             print("Metric for a Classification Model")
-            regression = False
-        if regression:
+        else:
             print("Metric for a Regression Model")
-            classification = False
-            
         for task in range(tasks):
-            if classification:
-                classification_prediction_train = self.set_prediction_threshold(model, X_train, y_train, task, threshold)
-                classification_prediction_val = self.set_prediction_threshold(model, X_val, y_val, task, threshold)
-                classification_prediction_test = self.set_prediction_threshold(model, X_test, y_test, task, threshold)
-                _, (TP, TN, FP, FN) = self.calc_confusion_matrix(classification_prediction_train)
-                _, (TP_val, TN_val, FP_val, FN_val) = self.calc_confusion_matrix(classification_prediction_val)
-                _, (TP_test, TN_test, FP_test, FN_test) = self.calc_confusion_matrix(classification_prediction_test)
-
-                train_text = f"For Training in task {task} \n "
-                train_statistics,_ = self.calc_Statistics(TP, TN, FP, FN, classification_prediction_train)
-                train_text += train_statistics
-
-                val_text = f"For Validation in task {task} \n "
-                val_statistics,_ = self.calc_Statistics(TP_val, TN_val, FP_val, FN_val, classification_prediction_val)
-                val_text += val_statistics
-                
-                test_text = f"For Testing in task {task} \n "
-                test_statistics,_ = self.calc_Statistics(TP_test, TN_test, FP_test, FN_test, classification_prediction_test)
-                test_text += test_statistics
-                full_text = train_text+"\n"+val_text+"\n"+test_text
+            
+            if self.model_type:
+                full_text,cross_val = self.get_ClassificationStats(model,X_train,y_train,X_test,y_test,X_val,y_val,task,threshold)
                 print(full_text)
-            if regression:
-                full_text = self.get_RegressionStats(model,X_train,y_train,X_test,y_test,X_val,y_val,task)
+                self.plot_Classification(cross_val[0],cross_val[1],cross_val[2])
+
+            if self.model_type == False:
+                full_text,cross_val = self.get_RegressionStats(model,X_train,y_train,X_test,y_test,X_val,y_val,task)
                 print(full_text)
+                self.plot_Regression(cross_val[0],cross_val[1],cross_val[2])

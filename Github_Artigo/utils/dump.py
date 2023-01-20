@@ -1,4 +1,71 @@
 def unused_code(self):
+        unused_11="""for index1 in range(prediction_train.shape[1]):
+
+#     train_pred = pd.DataFrame(y_train[:,index1],prediction_train[:,index1]) 
+#     train_pred['y_pred'] = train_pred.index
+#     train_pred = train_pred.rename(columns = {0: 'y_obs'})
+#     train_pred2 = train_pred.dropna()
+#     train_pred2 = train_pred2.reset_index(drop=True)
+#     train_pred2['Folds'] = 'Train'
+#     train_pred2 = train_pred2.assign(Folds_error = abs(train_pred2['y_pred'] - train_pred2['y_obs']))
+#     train_pred2['Folds error Mean'] = train_pred2['Folds_error'].mean() 
+#     train_pred2['Folds error 3*sigma'] = train_pred2['Folds_error'].std()
+#     train_pred2['Folds error 3*sigma'] = train_pred2['Folds error 3*sigma']*3
+
+#     for index2 in range(prediction_val.shape[1]):
+         
+#         val_pred = pd.DataFrame(y_val[:,index2],prediction_val[:,index2])
+#         val_pred['y_pred'] = val_pred.index
+#         val_pred = val_pred.rename(columns = {0: 'y_obs'})
+#         val_pred2 = val_pred.dropna()
+#         val_pred2 = val_pred2.reset_index(drop=True)
+#         val_pred2['Folds'] = 'val'
+#         val_pred2 = val_pred2.assign(Folds_error = abs(val_pred2['y_pred'] - val_pred2['y_obs']))
+#         val_pred2['Folds error Mean'] = val_pred2['Folds_error'].mean() 
+#         val_pred2['Folds error 3*sigma'] = val_pred2['Folds_error'].std()
+#         val_pred2['Folds error 3*sigma'] = val_pred2['Folds error 3*sigma']*3
+          
+#         for index3 in range(prediction_test.shape[1]):
+         
+#             test_pred = pd.DataFrame(y_test[:,index3],prediction_test[:,index3])
+#             test_pred['y_pred'] = test_pred.index
+#             test_pred = test_pred.rename(columns = {0: 'y_obs'})
+#             test_pred2 = test_pred.dropna()
+#             test_pred2 = test_pred2.reset_index(drop=True)
+#             test_pred2['Folds'] = 'Test'
+#             test_pred2 = test_pred2.assign(Folds_error = abs(test_pred2['y_pred'] - test_pred2['y_obs']))
+#             test_pred2['Folds error Mean'] = test_pred2['Folds_error'].mean() 
+#             test_pred2['Folds error 3*sigma'] = test_pred2['Folds_error'].std()
+#             test_pred2['Folds error 3*sigma'] = test_pred2['Folds error 3*sigma']*3
+
+            crossval_df = pd.concat([train_pred2, val_pred2, test_pred2], axis=0).reset_index(drop=True)
+
+            if index1 == index2 and index1 == index3:
+                    
+                r2  = (train_pred2["y_obs"].corr(train_pred2["y_pred"]))    
+                print(("Results for task {} (train)").format(index2+1))
+                print("r^2\t%.2f" % r2)
+                print ("rmse\t%.2f" % sqrt(mean_squared_error(train_pred2["y_obs"],train_pred2["y_pred"])))
+                print ("mse\t%.2f" % (mean_squared_error(train_pred2["y_obs"],train_pred2["y_pred"])))
+                print ("mae\t%.2f"  %mean_absolute_error(train_pred2["y_obs"],train_pred2["y_pred"]))   
+
+                r2 = (val_pred2["y_obs"].corr(val_pred2["y_pred"]))
+                print(("Results for task {} (validation)").format(index3+1))
+                print("r^2\t%.2f" % r2)
+                print ("rmse\t%.2f"  % sqrt(mean_squared_error(val_pred2["y_pred"],val_pred2["y_obs"])))
+                print ("mse\t%.2f"  % (mean_squared_error(val_pred2["y_pred"],val_pred2["y_obs"])))
+                print ("mae\t%.2f"  % mean_absolute_error(val_pred2["y_pred"],val_pred2["y_obs"]))
+                
+                r2 = (test_pred2["y_obs"].corr(test_pred2["y_pred"])) 
+                print(("Results for task {} (test)").format(index1+1))
+                print("r^2\t%.2f" % r2)
+                print ("rmse\t%.2f"  % sqrt(mean_squared_error(test_pred2["y_pred"],test_pred2["y_obs"]))) 
+                print ("mse\t%.2f"  % (mean_squared_error(test_pred2["y_pred"],test_pred2["y_obs"])))
+                print ("mae\t%.2f"  % mean_absolute_error(test_pred2["y_pred"],test_pred2["y_obs"]))
+
+                g = sns.lmplot(x="y_pred", y="y_obs", hue="Folds", data=crossval_df, fit_reg=False, height=7, 
+                markers=["o", "o", "o"], palette="rocket",scatter_kws={"s": 50,'alpha':0.9},  aspect=30/30)
+                sns.regplot(x="y_pred", y="y_obs", data=crossval_df, scatter=False, ax=g.axes[0, 0]) """
         unused_10 = """def calc_confusion_matrix(y_train:np.array,num_tasks:int,prediction_train:np.array,y_val:np.array,prediction_val:np.array):
     pass
     for task_idx in range(num_tasks):

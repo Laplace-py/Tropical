@@ -22,8 +22,7 @@ class Featurizer:
                 continue
             output[feature_mapping[feature]] = 1.0
         return output
-
-
+    
 class AtomFeaturizer(Featurizer):
     def __init__(self, allowable_sets):
         super().__init__(allowable_sets)
@@ -39,8 +38,6 @@ class AtomFeaturizer(Featurizer):
 
     def hybridization(self, atom):
         return atom.GetHybridization().name.lower()
-
-
 class BondFeaturizer(Featurizer):
     def __init__(self, allowable_sets):
         super().__init__(allowable_sets)
@@ -60,7 +57,6 @@ class BondFeaturizer(Featurizer):
     def conjugated(self, bond):
         return bond.GetIsConjugated()
 
-
 atom_featurizer = AtomFeaturizer(
     allowable_sets={
         "symbol": {"B", "Br", "C", "Ca", "Cl", "F", "H", "I", "N", "Na", "O", "P", "S"},
@@ -77,7 +73,6 @@ bond_featurizer = BondFeaturizer(
     }
 )
 
-
 def molecule_from_smiles(SMILES):
     # MolFromSmiles(m, sanitize=True) should be equivalent to
     # MolFromSmiles(m, sanitize=False) -> SanitizeMol(m) -> AssignStereochemistry(m, ...)
@@ -91,7 +86,6 @@ def molecule_from_smiles(SMILES):
 
     Chem.AssignStereochemistry(molecule, cleanIt=True, force=True)
     return molecule
-
 
 def graph_from_molecule(molecule):
     # Initialize graph
@@ -112,7 +106,6 @@ def graph_from_molecule(molecule):
             bond_features.append(bond_featurizer.encode(bond))
 
     return np.array(atom_features), np.array(bond_features), np.array(pair_indices)
-
 
 def graphs_from_smiles(SMILES_list):
     # Initialize graphs

@@ -42,7 +42,6 @@ class EdgeNetwork(layers.Layer):
         )
         return aggregated_features
 
-
 class MessagePassing(layers.Layer):
     def __init__(self, units, steps=4, **kwargs):
         super().__init__(**kwargs)
@@ -105,7 +104,6 @@ class PartitionPadding(layers.Layer):
         gather_indices = T.where(T.reduce_sum(atom_features_stacked, (1, 2)) != 0)
         gather_indices = T.squeeze(gather_indices, axis=-1)
         return T.gather(atom_features_stacked, gather_indices, axis=0)
-
     
 class TransformerEncoderReadout(layers.Layer):
     def __init__(

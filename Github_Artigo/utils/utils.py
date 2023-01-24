@@ -47,7 +47,7 @@ class GLOBALS():
 class Commons():
     def __init__(self):
         pass
-    def load_dataset(self, dataset:pd.DataFrame,smiles_col:str ,task_start:int=0, number_of_tasks:int=1) -> tuple:
+    def load_dataset(self, dataset:pd.DataFrame,smiles_col:str ,task_start:int=0, number_of_tasks:int=1) -> Tuple[pd.DataFrame,np.ndarray,list[str]]:
         task_end = task_start + number_of_tasks
         
         df = pd.read_csv(dataset, sep=",", low_memory=False)
@@ -256,8 +256,10 @@ class TS_Helper():
         - `TensorFlow using GPU <https://www.tensorflow.org/versions/r0.9/how_tos/using_gpu/index.html>`_
         """
         print("  tensorlayer: GPU MEM Fraction %f" % gpu_fraction)
+        
         gpu_options = T.compat.v1.GPUOptions(per_process_gpu_memory_fraction=gpu_fraction)
         sess = T.compat.v1.Session(config = T.compat.v1.ConfigProto(gpu_options = gpu_options))
+        print("Num GPUs Available: ", len(T.config.list_physical_devices('GPU')))
         return sess 
     
     def plot_history(self,history:dict) -> None:
@@ -284,6 +286,7 @@ class TS_Helper():
         """
         prediction_df: dataframe with predictions and target values
         """
+        
         confusion = SK.confusion_matrix(prediction_df["pred"], prediction_df["y"])
         #[row, column]
         print("Confusion matrix:",confusion)
@@ -450,11 +453,12 @@ class TS_Helper():
 
         return train_text+"\n"+val_text+"\n"+test_text,train_val_test,train_confusion_matrix,val_confusion_matrix,test_confusion_matrix
     
-    def get_modelStats(self,model:T.keras.models.Sequential(),X_train,y_train,X_test,y_test,X_val,y_val,tasks:int,threshold:float=0.5) -> None:
+    def get_DLmodelStats(self,model:T.keras.models.Sequential(),X_train,y_train,X_test,y_test,X_val,y_val,tasks:int=1,threshold:float=0.5) -> None:
         if self.model_type == 0:
             print("Metric for a Classification Model")
         else:
             print("Metric for a Regression Model")
+
         for task in range(tasks):
             
             if self.model_type == 0:

@@ -2,3 +2,5 @@
 .gitattributes
 .ipynb_checkpoints
 .profraw
+.\utils\__pycache__
+

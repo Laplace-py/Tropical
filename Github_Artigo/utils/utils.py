@@ -217,7 +217,7 @@ class Statistics():
         FN = confusion[1, 0]
         return confusion, (TP, TN, FP, FN)
 
-    def set_prediction_threshold(self,model:T.keras.models.Sequential(),X_data:pd.DataFrame,y_data:pd.DataFrame,task:int,threshold:float) -> pd.DataFrame:
+    def set_prediction_threshold(self,model:T.keras.models, X_data:pd.DataFrame, y_data:pd.DataFrame, task:int, threshold:float) -> pd.DataFrame:
         """
         model: trained model
         X_data: input data
@@ -233,7 +233,7 @@ class Statistics():
         #print(predictions_df)
         return predictions_df
 
-    def calc_Statistics(self,TP:int,TN:int,FP:int,FN:int,prediction_df) -> Tuple[str,tuple[float,float,float,float,float,float,float,float,float,float,float,float,float]]:
+    def calc_Statistics(self,TP:int,TN:int,FP:int,FN:int,prediction_df:pd.DataFrame=None, pred_y=None, obs_y=None) -> Tuple[str,tuple[float,float,float,float,float,float,float,float,float,float,float,float,float]]:
         """
         TP: True Positive
         TN: True Negative
@@ -244,8 +244,12 @@ class Statistics():
         precision = TP / (TP + FP)
         recall = TP / (TP + FN)
         f1 = 2 * (precision * recall) / (precision + recall)
-        MCC = SK.matthews_corrcoef(prediction_df["y"], prediction_df["pred"])
-        kappa = SK.cohen_kappa_score(prediction_df["y"], prediction_df["pred"])
+        if prediction_df is not None:
+            MCC = SK.matthews_corrcoef(prediction_df["y"], prediction_df["pred"])
+            kappa = SK.cohen_kappa_score(prediction_df["y"], prediction_df["pred"])
+        elif pred_y is not None and obs_y is not None:
+            MCC = SK.matthews_corrcoef(obs_y, pred_y)
+            kappa = SK.cohen_kappa_score(obs_y, pred_y)
         SE = (TP/(TP+FN))
         SP = (TN/(TN+FP))
         PPV = (TP/(TP+FP))
@@ -256,16 +260,38 @@ class Statistics():
         statistics = tabulate.tabulate([["Accuracy",accuracy],["Precision",precision],["Recall",recall],["F1",f1],["MCC",MCC],["Kappa",kappa],["SE",SE],["SP",SP],["PPV",PPV],["NPV",NPV],["TPR",TPR],["FPR",FPR]],headers=["Statistic","Value"])
         return statistics,(accuracy, precision, recall, f1, MCC, kappa, SE, SP, PPV, NPV, TPR, FPR)
 
-    def calc_RegressionStatistics(self,prediction_df)-> Tuple[str,tuple[float,float,float]]:
+    def calc_RegressionStatistics(self,prediction_df:pd.DataFrame=None, pred_y=None, obs_y=None)-> Tuple[str,tuple[float,float,float]]:
         """
         prediction_df: dataframe with predictions and target values
         """
-        MSE = SK.mean_squared_error(prediction_df["y"], prediction_df["pred"])
-        MAE = SK.mean_absolute_error(prediction_df["y"], prediction_df["pred"])
-        R2 = SK.r2_score(prediction_df["y"], prediction_df["pred"])
-        #print all this stats in a table
+        if prediction_df is not None:
+            MSE = SK.mean_squared_error(prediction_df["y"], prediction_df["pred"])
+            MAE = SK.mean_absolute_error(prediction_df["y"], prediction_df["pred"])
+            R2 = SK.r2_score(prediction_df["y"], prediction_df["pred"])
+            #print all this stats in a table
+        if pred_y is not None and obs_y is not None:
+            MSE = SK.mean_squared_error(obs_y, pred_y)
+            MAE = SK.mean_absolute_error(obs_y, pred_y)
+            R2 = SK.r2_score(obs_y, pred_y)
         statistics = tabulate.tabulate([["MSE",MSE],["MAE",MAE],["R2",R2]],headers=["Statistic","Value"])
         return statistics,(MSE, MAE, R2)
+
+    def set_3SigmaStats(self,obs_y,pred_y) -> Tuple[np.array,np.array]:
+        data_pred = pd.DataFrame(data={"y":obs_y,"pred":pred_y}) 
+        data_pred = data_pred.assign(Folds_error = abs(data_pred['pred'] - data_pred['y']))
+        error = data_pred['Folds_error'].values
+        data_pred['3*sigma'] = 3*np.std(error)
+        #keep only the ones that are within +3 to -3 standard deviations.
+        #Dum dum way to get rid of outliers
+        drop_list = []
+        for i in data_pred.index:
+            if abs(data_pred['Folds_error'][i]) <= abs(data_pred['3*sigma'][i]):
+                drop_list.append(i)
+        print("Drop list size: ",len(drop_list))
+        data_pred.drop(drop_list,axis=0,errors='ignore',inplace=True) 
+        pred_y = data_pred['pred'].values
+        obs_y = data_pred['y'].values
+        return obs_y, pred_y
 
     def plot_Regression(self,*X_train)-> None:
         """
@@ -338,7 +364,7 @@ class Statistics():
                 elif self.model_type == self.Regression:
                     regression_prediction = pd.DataFrame(data={"pred":model.predict(X_data)[:,task], "y": y_data[:,task]},index=range(len(y_data)))
                     full_text,_ = self.calc_RegressionStatistics(regression_prediction)
-                    print(full_text)
+                    print(full_text,end="\n\n")
                     self.plot_Regression(regression_prediction)
             except:
                 #X_data = Commons.ndarrayTo1Darray(Commons,X_data)
@@ -354,10 +380,9 @@ class Statistics():
                 elif self.model_type == self.Regression:
                     regression_prediction = pd.DataFrame(data={"pred":model.predict(X_data), "y": y_data},index=range(len(y_data)))
                     full_text,_ = self.calc_RegressionStatistics(regression_prediction)
-                    print(full_text)
+                    print(full_text,end="\n\n")
                     self.plot_Regression(regression_prediction)
-       
-                    
+                        
 class TS_Helper(Statistics):
     
     def __init__(self):
@@ -446,32 +471,82 @@ class TS_Helper(Statistics):
 
         plt.show()
 
-    def get_modeStatsFor_Train_Test(self,model:T.keras.models,X_train,y_train,X_test,y_test,tasks:int=1,threshold:float=0.5) -> None:
-        
-        self.get_modelStats(model,X_train,y_train,tasks,threshold)
-        self.get_modelStats(model,X_test,y_test,tasks,threshold)
-        
-        if self.model_type == self.Regression:
-                y_train = Commons.ndarrayTo1Darray(Commons,y_train)
-                y_test = Commons.ndarrayTo1Darray(Commons,y_test)
-                for task in range(tasks):
-                    train_prediction = pd.DataFrame(data={"pred":model.predict(X_train)[:,task],"y":y_train},index=range(len(y_train)))
-                    test_prediction = pd.DataFrame(data={"pred":model.predict(X_test)[:,task],"y":y_test},index=range(len(y_test)))
-                    self.plot_Regression(train_prediction,test_prediction)
+    def get_modelStatsFor_nSplits(self,model:T.keras.models,tasks:int=1,threshold:float=0.5,**XandY_data) -> None:
+        """
+        Assumes that the keys of XandY_data are passed in order of X_data_1,y_data_1, . . . X_data_n,y_data_n.
 
-    def get_modelStatsFor_Train_Test_Validation(self,model:T.keras.models,X_train,y_train,X_test,y_test,X_val,y_val,tasks:int=1,threshold:float=0.5) -> None:
+        Where X_data_1 is the X_data for the first split and y_data_1 is the y_data for the first split, and so on.
+
+        We assume that the number of X_data and y_data are equal.
+
+        obs: X_data could be X_train and y_data could be y_train
+        """
+        X_data = []
+        y_data = []
+        predictions = []
+        for k,v in XandY_data.items():
+            
+            if k.startswith("X"):
+                X_data.append(v)
+            
+            elif k.startswith("y"):
+                y_data.append(v)
         
-        self.get_modelStats(model,X_train,y_train,tasks,threshold)
-        self.get_modelStats(model,X_test,y_test,tasks,threshold)
-        self.get_modelStats(model,X_val,y_val,tasks,threshold)
+        if len(X_data) == len(y_data):
+            
+            for i in range(len(X_data)):
+                self.get_modelStats(model,X_data[i],y_data[i],tasks,threshold)
+                
+                if self.model_type == self.Regression:
+                    y_data[i] = Commons.ndarrayTo1Darray(Commons,y_data[i])
+                    
+                    for task in range(tasks):
+                        prediction = pd.DataFrame(data={"pred":model.predict(X_data[i])[:,task],"y":y_data[i]},index=range(len(y_data[i])))
+                        predictions.append(prediction)
+            
+            if self.model_type == self.Regression:
+                    self.plot_Regression(*predictions)
+            #self.plot_Regression(predictions)
+        else:
+            raise Exception("X and y data must be equal in length")
 
-        if self.model_type == self.Regression:
-                y_train = Commons.ndarrayTo1Darray(Commons,y_train)
-                y_test = Commons.ndarrayTo1Darray(Commons,y_test)
-                y_val = Commons.ndarrayTo1Darray(Commons,y_val)
-                for task in range(tasks):
-                    train_prediction = pd.DataFrame(data={"pred":model.predict(X_train)[:,task],"y":y_train},index=range(len(y_train)))
-                    test_prediction = pd.DataFrame(data={"pred":model.predict(X_test)[:,task],"y":y_test},index=range(len(y_test)))
-                    valid_prediction = pd.DataFrame(data={"pred":model.predict(X_val)[:,task],"y":y_val},index=range(len(y_val)))
-                    self.plot_Regression(train_prediction,test_prediction,valid_prediction)
+class ML_Helper(Statistics):
+    def __init__(self):
+        super().__init__()
+    
+    
+    def get_ML_StatsForNSplits(self,model:T.keras.models,**XandY_data) -> None:
+        X_data = []
+        y_data = []
+        for k,v in XandY_data.items():
+            if k.startswith("X"):
+                X_data.append(v)
+            elif k.startswith("y"):
+                y_data.append(v)
+        
+        if len(X_data) == len(y_data):
+            for i in range(len(X_data)):
+                
+                if self.model_type == self.Regression:
+                    y_pred = model.predict(X_data[i])
+                    text,(_,_,_) = self.calc_RegressionStatistics(pred_y=y_pred,obs_y=y_data[i])
+                    print("Before 3 Sigma:\n",text,end="\n\n")
 
+                    y_data[i], y_pred = self.set_3SigmaStats(obs_y=y_data[i],pred_y=y_pred)
+                    text,(_,_,_) = self.calc_RegressionStatistics(pred_y=y_pred,obs_y=y_data[i])
+                    print("After 3 Sigma:\n",text)
+
+                elif self.model_type == self.Classification:
+                    
+                    y_pred = (model.predict_proba(X_data[i])[:,1] >= 0.5).astype(bool)
+                    prediction_df = pd.DataFrame({'y': y_data[i], 'pred': y_pred})
+                    confusion, (TP, TN, FP, FN) = self.calc_confusion_matrix(prediction_df)
+                    text,_  =  self.calc_Statistics(TP, TN, FP, FN, prediction_df)
+                    
+                    print(text)
+                    self.plot_Classification(confusion,[['T','F'],["P","N"]],title='Test set')
+
+        else:
+            raise Exception("X and y data must be equal in length")
+    
+    

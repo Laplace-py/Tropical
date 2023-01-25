@@ -233,7 +233,7 @@ def seiLa(train_dataset, val_dataset, test_dataset, y_train, y_val, y_test, mode
         pass
 
 def notes():        
-
+        
         # for index1 in range(prediction_train.shape[1]):
 
         #     train_pred = pd.DataFrame(y_train[:,index1],prediction_train[:,index1]) 
@@ -307,6 +307,12 @@ def notes():
         pass
 
 def unused_code(self):
+        unused_13 = """                    # print("Before 3 Sigma:\n",full_text,end="\n\n")
+                    # y_pred = Commons.ndarrayTo1Darray(Commons,model.predict(X_data)[:,task])
+                    # y_data = Commons.ndarrayTo1Darray(Commons,y_data)
+                    # y_pred,y_obs = self.set_3SigmaStats(y_data,y_pred)
+                    # full_text,_ = self.calc_RegressionStatistics(pred_y=y_pred,obs_y=y_obs)
+                    # print("After 3 Sigma:\n",full_text,end="\n\n")"""
         unused_12 = """# for task in range(tasks):
             
             # if self.model_type == self.Classification:

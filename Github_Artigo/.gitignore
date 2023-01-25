@@ -3,4 +3,4 @@
 .ipynb_checkpoints
 .profraw
 .\utils\__pycache__
-
+*.png

@@ -1,0 +1,30 @@
+final-220-NEW-1 Fold 4:
+ Before 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           3.01332
+MAE           1.23388
+R2           -0.0779146
+
+After 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           2.89549
+MAE           1.54879
+R2           -0.0963466
+
+Before 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           2.93404
+MAE           1.22766
+R2           -0.115448
+
+After 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           2.59119
+MAE           1.4717
+R2           -0.137548
+
+

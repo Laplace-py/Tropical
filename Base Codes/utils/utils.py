@@ -110,7 +110,6 @@ class Commons():
         fp2 = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol2, radius, nBits=fp_size, useFeatures=feat)
         return DataStructs.TanimotoSimilarity(fp1, fp2)
 
-    # function to calculate the similarity between two molecules
 class Shap_Helper():
     def __init__(self):
         pass
@@ -542,9 +541,10 @@ class ML_Helper(Statistics):
         super().__init__()
     
     
-    def get_ML_StatsForNSplits(self,model:T.keras.models,**XandY_data) -> None:
+    def get_ML_StatsForNSplits(self,model:T.keras.models,**XandY_data) -> str:
         X_data = []
         y_data = []
+        texts = ""
         for k,v in XandY_data.items():
             if k.startswith("X"):
                 X_data.append(v)
@@ -558,12 +558,12 @@ class ML_Helper(Statistics):
                     y_pred = model.predict(X_data[i])
                     text,(_,_,_) = self.calc_RegressionStatistics(obs_y=y_data[i],pred_y=y_pred)
                     print("Before 3 Sigma:\n",text,end="\n\n")
-                    
+                    texts += "Before 3 Sigma:\n"+text+"\n\n"
                     print("After 3 Sigma:\n")
                     y_data[i], y_pred = self.set_3SigmaStats(obs_y=y_data[i],pred_y=y_pred)
                     text,(_,_,_) = self.calc_RegressionStatistics(obs_y=y_data[i],pred_y=y_pred)
                     print(text,end="\n\n")
-
+                    texts += "After 3 Sigma:\n"+text+"\n\n"
                 elif self.model_type == self.Classification:
                     
                     y_pred = (model.predict_proba(X_data[i])[:,1] >= 0.5).astype(bool)
@@ -572,14 +572,16 @@ class ML_Helper(Statistics):
                     text,_  =  self.calc_Statistics(TP, TN, FP, FN, prediction_df)
                     
                     print(text)
+                    texts += text
                     self.plot_Classification(confusion,[['T','F'],["P","N"]],title='Test set')
 
         else:
             raise Exception("X and y data must be equal in length")
+        return texts
     
-class Model_Generator(Statistics):
-        def __init__(self,):
-                super().__init__()
+class Model_Generator():
+        def __init__(self):
+            pass
         LGBM = GLOBALS.LGBM
         RF = GLOBALS.RF
         SVM = GLOBALS.SVM
@@ -605,7 +607,7 @@ class Model_Generator(Statistics):
         "SVM":{
             "classifier":SVC(),
             "params":{
-                'C': (0.01, 10.0, 'log-uniform'),
+                'C': (1e-7, 1e-1, 'uniform'),
                 #'gamma': (0.01, 1.0, 'log-uniform'),
                 'degree': (1, 8),
                 'kernel': ['linear', 'poly', 'rbf', 'sigmoid'],

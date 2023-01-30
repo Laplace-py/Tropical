@@ -7,7 +7,9 @@ from rdkit.Chem import DataStructs
 from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem.AllChem import GetMorganFingerprintAsBitVect
 import itertools
-
+import lightgbm as lgb
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
 from rdkit.Chem import rdDepictor
 rdDepictor.SetPreferCoordGen(True)
 from rdkit.Chem.Draw import rdMolDraw2D
@@ -44,6 +46,10 @@ class GLOBALS():
     REGRESSION: int = 1
     SCAFFOLD_SPLIT: int = 0
     RANDOM_SPLIT: int = 1
+    ML_MODELS = ['LGBM','RF','SVM']
+    LGBM = ML_MODELS[0]
+    RF = ML_MODELS[1]
+    SVM = ML_MODELS[2]
 
 class Commons():
     def __init__(self):
@@ -90,6 +96,21 @@ class Commons():
         descs = np.asarray(descs, dtype=np.float32)
         return descs
     
+    def calc_similarity(self,smiles1:str, smiles2:str, fp_size:int, radius:int, feat:bool) -> float:
+        """
+        calcs morgan fingerprints as a numpy array.
+        """
+        mol1 = Chem.MolFromSmiles(smiles1, sanitize=True)
+        mol1.UpdatePropertyCache(False)
+        mol2 = Chem.MolFromSmiles(smiles2, sanitize=True)
+        mol2.UpdatePropertyCache(False)
+        Chem.GetSSSR(mol1)
+        Chem.GetSSSR(mol2)
+        fp1 = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol1, radius, nBits=fp_size, useFeatures=feat)
+        fp2 = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol2, radius, nBits=fp_size, useFeatures=feat)
+        return DataStructs.TanimotoSimilarity(fp1, fp2)
+
+    # function to calculate the similarity between two molecules
 class Shap_Helper():
     def __init__(self):
         pass
@@ -278,16 +299,22 @@ class Statistics():
 
     def set_3SigmaStats(self,obs_y,pred_y) -> Tuple[np.array,np.array]:
         data_pred = pd.DataFrame(data={"y":obs_y,"pred":pred_y}) 
-        data_pred = data_pred.assign(Folds_error = abs(data_pred['pred'] - data_pred['y']))
+        data_pred = data_pred.assign(Folds_error = [abs(data_pred['pred'][i] - data_pred['y'][i]) for i in data_pred.index])
         error = data_pred['Folds_error'].values
-        data_pred['3*sigma'] = 3*np.std(error)
+        error_per_line = [np.std([err,np.std(error)])*3 for err in error]
+
+        print("Mean error: ",np.mean(error),end="\n\n")
+        print("Average std error: ",np.std(error),end="\n\n")
+        data_pred['3*sigma'] = error_per_line
+        #print(error_per_line, end="\n\n")
+        #data_pred['3*sigma'] = 
         #keep only the ones that are within +3 to -3 standard deviations.
         #Dum dum way to get rid of outliers
         drop_list = []
         for i in data_pred.index:
             if abs(data_pred['Folds_error'][i]) <= abs(data_pred['3*sigma'][i]):
                 drop_list.append(i)
-        print("Drop list size: ",len(drop_list))
+        print("Drop list size: ",len(drop_list),end="\n\n")
         data_pred.drop(drop_list,axis=0,errors='ignore',inplace=True) 
         pred_y = data_pred['pred'].values
         obs_y = data_pred['y'].values
@@ -529,12 +556,13 @@ class ML_Helper(Statistics):
                 
                 if self.model_type == self.Regression:
                     y_pred = model.predict(X_data[i])
-                    text,(_,_,_) = self.calc_RegressionStatistics(pred_y=y_pred,obs_y=y_data[i])
+                    text,(_,_,_) = self.calc_RegressionStatistics(obs_y=y_data[i],pred_y=y_pred)
                     print("Before 3 Sigma:\n",text,end="\n\n")
-
+                    
+                    print("After 3 Sigma:\n")
                     y_data[i], y_pred = self.set_3SigmaStats(obs_y=y_data[i],pred_y=y_pred)
-                    text,(_,_,_) = self.calc_RegressionStatistics(pred_y=y_pred,obs_y=y_data[i])
-                    print("After 3 Sigma:\n",text)
+                    text,(_,_,_) = self.calc_RegressionStatistics(obs_y=y_data[i],pred_y=y_pred)
+                    print(text,end="\n\n")
 
                 elif self.model_type == self.Classification:
                     
@@ -549,4 +577,54 @@ class ML_Helper(Statistics):
         else:
             raise Exception("X and y data must be equal in length")
     
-    
+class Model_Generator(Statistics):
+        def __init__(self,):
+                super().__init__()
+        LGBM = GLOBALS.LGBM
+        RF = GLOBALS.RF
+        SVM = GLOBALS.SVM
+        Models: dict = {
+        "LGBM":{
+            "classifier":lgb.LGBMClassifier(),                   
+            "params":{
+                'learning_rate': (0.01, 0.1, 'uniform'), 
+                'num_leaves': (1, 15),
+                'n_estimators': (2, 50), 
+                'max_depth': (1, 10),
+                'subsample': (0.1, 0.3), 
+            },
+        },
+        "RF":{
+            "classifier":RandomForestClassifier(),
+            "params":{
+            'max_features': ['auto', 'sqrt'],
+            'n_estimators': [2, 150],
+            "max_depth": [2, 10],
+            },
+        },
+        "SVM":{
+            "classifier":SVC(),
+            "params":{
+                'C': (0.01, 10.0, 'log-uniform'),
+                #'gamma': (0.01, 1.0, 'log-uniform'),
+                'degree': (1, 8),
+                'kernel': ['linear', 'poly', 'rbf', 'sigmoid'],
+            },
+        },
+        "Dense":T.keras.models.Sequential([
+            T.keras.layers.Dense(64,activation="relu"),
+            T.keras.layers.Dense(64,activation="relu"),
+            T.keras.layers.Dense(1,activation="sigmoid")
+        ]),
+        "CNN":T.keras.models.Sequential([
+            T.keras.layers.Conv1D(64,3,activation="relu"),
+            T.keras.layers.MaxPooling1D(3),
+            T.keras.layers.Conv1D(64,3,activation="relu"),
+            T.keras.layers.MaxPooling1D(3),
+            T.keras.layers.Conv1D(64,3,activation="relu"),
+            T.keras.layers.GlobalMaxPooling1D(),
+            T.keras.layers.Dense(64,activation="relu"),
+            T.keras.layers.Dense(1,activation="sigmoid")
+        ]),
+    }
+        

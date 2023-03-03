@@ -67,7 +67,11 @@ class Commons():
     
     def get_percentileAsFraction(self,total:int,percentile:float) -> str:
         return str(f"{math.floor(total*percentile)}"+"/"+f"{total}")
-
+    
+    def gen_PercentileAsFractionCol(self,df,df_TotalCol,df_PercentileCol) -> str:
+        df["PercentileAsFraction"] = df.apply(lambda x: self.get_percentileAsFraction(x[df_TotalCol],x[df_PercentileCol]),axis=1)
+        return df
+    
     def strEqstr(self, a:str, b:str) -> bool:
         return a.lower() == b.lower() 
 

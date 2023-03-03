@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import math
 import tensorflow as T
 from rdkit import Chem
 from rdkit.Chem import AllChem
@@ -19,12 +20,17 @@ IPythonConsole.molSize = (400,400)
 import matplotlib.pyplot as plt
 import tabulate
 import sklearn.metrics as SK
-from tensorflow.keras import backend as K
-from tensorflow.keras.losses import *
 import seaborn as sns
+from sklearn.mixture import GaussianMixture
+from sklearn.cluster import KMeans,DBSCAN,AgglomerativeClustering,OPTICS,AffinityPropagation,Birch
 from typing import List, Set, Tuple, Union,Callable, Optional, Dict, Any
 from dataclasses import dataclass
+import os
+from sklearn.model_selection import *
+from sklearn.metrics import *
 import PIL
+from skopt import BayesSearchCV
+
 @dataclass
 class ChemType():
     """
@@ -46,14 +52,25 @@ class GLOBALS():
     REGRESSION: int = 1
     SCAFFOLD_SPLIT: int = 0
     RANDOM_SPLIT: int = 1
-    ML_MODELS = ['LGBM','RF','SVM']
-    LGBM = ML_MODELS[0]
-    RF = ML_MODELS[1]
-    SVM = ML_MODELS[2]
+    AVAILABLE_MODELS = [
+        'LGBM','RF','SVM','KMeans',
+        'GaussianMixture','DBSCAN',
+        'OPTICS','AgglomerativeClustering',
+        'AffinityPropagation','Birch'
+        ]
+    CLASSIFIER = "classifier"
+    PARAMS = 'params'
 
 class Commons():
     def __init__(self):
         pass
+    
+    def get_percentileAsFraction(self,total:int,percentile:float) -> str:
+        return str(f"{math.floor(total*percentile)}"+"/"+f"{total}")
+
+    def strEqstr(self, a:str, b:str) -> bool:
+        return a.lower() == b.lower() 
+
     def load_dataset(self, dataset:pd.DataFrame,smiles_col:str ,task_start:int=0, number_of_tasks:int=1) -> Tuple[pd.DataFrame,np.ndarray,list[str]]:
         task_end = task_start + number_of_tasks
         
@@ -63,6 +80,25 @@ class Commons():
         print(f"Loaded dataset {dataset} with shape: {df.shape}")
         return df,y_train,smiles
     
+    def load_dataset_list(self,path:str,how_many_files:int,smiles_col:str,task_start:int,local_num_tasks:int,wich_splits:List[str]="Train",fold:int=0):
+        """
+        Loads the x_data,y_data,smiles for (Train or Test or Validation) and  returns a generator with the data, to access the data use next(generator), or a for loop
+        
+        Data is returned in the following order: x_data, y_data, smiles
+        
+        path: is the path to the folder where the files are located, use relative path
+        global_tasks: is the number of tasks you want to iterate over, considering that each task is in a different file
+        smiles_col: is the name of the column that contains the smiles
+        task_start: is the column where the tasks start
+        local_num_tasks: is the number of tasks in each file
+        wich_split: is the type of split you want to load, train, val or test, 
+        FOLD: is the fold you want to load, considering that FOLD is in the name of the file
+        """
+        for wich_split in wich_splits:
+            data = [path+"/"+train for train in os.listdir(path) if train.find(wich_split)!=-1 and train.find(str(fold))!=-1 and train.endswith(".csv")]
+            for data_ in data:
+                yield self.load_dataset(data_,smiles_col,task_start,local_num_tasks),wich_split
+        
     def calc_fp(self,smiles:list,fp_size:int, radius:int, feat:bool) -> np.ndarray:
         """
         calcs morgan fingerprints as a numpy array.
@@ -74,9 +110,8 @@ class Commons():
         fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, radius, nBits=fp_size, useFeatures=feat)
         a = np.zeros((0,), dtype=np.float32)
         a = Chem.DataStructs.ConvertToNumpyArray(fp, a)
-        return np.asarray(fp)
+        return np.asarray(fp)    
     
-    #function to transform ndarray to 1d array
     def ndarrayTo1Darray(self,ndarray:np.ndarray) -> np.ndarray:
         return np.reshape(ndarray, (ndarray.shape[0],)) 
     
@@ -96,6 +131,11 @@ class Commons():
         descs = np.asarray(descs, dtype=np.float32)
         return descs
     
+    def setML_FPs(self,smiles,y_data:np.ndarray,size:int,radius:int,feat:bool) -> Tuple[np.ndarray,np.ndarray]:
+        y_data = y_data.ravel()
+        y_data = np.array(y_data).astype(int)
+        return self.assing_fp(smiles,size,radius,feat),y_data
+
     def calc_similarity(self,smiles1:str, smiles2:str, fp_size:int, radius:int, feat:bool) -> float:
         """
         calcs morgan fingerprints as a numpy array.
@@ -253,7 +293,7 @@ class Statistics():
         #print(predictions_df)
         return predictions_df
 
-    def calc_Statistics(self,TP:int,TN:int,FP:int,FN:int,prediction_df:pd.DataFrame=None, pred_y=None, obs_y=None) -> Tuple[str,tuple[float,float,float,float,float,float,float,float,float,float,float,float,float]]:
+    def calc_Statistics(self,TP:int,TN:int,FP:int,FN:int,prediction_df:pd.DataFrame=None, pred_y=None, obs_y=None) -> Tuple[str,tuple[float,float,float,float,float,float,float,float,float,float,float,float,float],pd.DataFrame]:
         """
         TP: True Positive
         TN: True Negative
@@ -278,9 +318,10 @@ class Statistics():
         FPR = (FP/(FP+TN))
         #print all this stats in a table
         statistics = tabulate.tabulate([["Accuracy",accuracy],["Precision",precision],["Recall",recall],["F1",f1],["MCC",MCC],["Kappa",kappa],["SE",SE],["SP",SP],["PPV",PPV],["NPV",NPV],["TPR",TPR],["FPR",FPR]],headers=["Statistic","Value"])
-        return statistics,(accuracy, precision, recall, f1, MCC, kappa, SE, SP, PPV, NPV, TPR, FPR)
+        df_statistics = pd.DataFrame(data={"Statistic":["Accuracy","Precision","Recall","F1","MCC","Kappa","SE","SP","PPV","NPV","TPR","FPR"],"Value":[accuracy,precision,recall,f1,MCC,kappa,SE,SP,PPV,NPV,TPR,FPR]})
+        return statistics,(accuracy, precision, recall, f1, MCC, kappa, SE, SP, PPV, NPV, TPR, FPR),df_statistics
 
-    def calc_RegressionStatistics(self,prediction_df:pd.DataFrame=None, pred_y=None, obs_y=None)-> Tuple[str,tuple[float,float,float]]:
+    def calc_RegressionStatistics(self,prediction_df:pd.DataFrame=None, pred_y=None, obs_y=None)-> Tuple[str,tuple[float,float,float],pd.DataFrame]:
         """
         prediction_df: dataframe with predictions and target values
         """
@@ -294,7 +335,8 @@ class Statistics():
             MAE = SK.mean_absolute_error(obs_y, pred_y)
             R2 = SK.r2_score(obs_y, pred_y)
         statistics = tabulate.tabulate([["MSE",MSE],["MAE",MAE],["R2",R2]],headers=["Statistic","Value"])
-        return statistics,(MSE, MAE, R2)
+        df_statistics = pd.DataFrame(data={"MSE":[MSE],"MAE":[MAE],"R2":[R2]})
+        return statistics,(MSE, MAE, R2),df_statistics
 
     def set_3SigmaStats(self,obs_y,pred_y) -> Tuple[np.array,np.array]:
         data_pred = pd.DataFrame(data={"y":obs_y,"pred":pred_y}) 
@@ -541,7 +583,7 @@ class ML_Helper(Statistics):
         super().__init__()
     
     
-    def get_ML_StatsForNSplits(self,model:T.keras.models,**XandY_data) -> str:
+    def get_ML_StatsForNSplits(self,model:T.keras.models,**XandY_data) -> Tuple[str,pd.DataFrame]:
         X_data = []
         y_data = []
         texts = ""
@@ -556,39 +598,80 @@ class ML_Helper(Statistics):
                 
                 if self.model_type == self.Regression:
                     y_pred = model.predict(X_data[i])
-                    text,(_,_,_) = self.calc_RegressionStatistics(obs_y=y_data[i],pred_y=y_pred)
+                    text,(_,_,_),df = self.calc_RegressionStatistics(obs_y=y_data[i],pred_y=y_pred)
+
                     print("Before 3 Sigma:\n",text,end="\n\n")
                     texts += "Before 3 Sigma:\n"+text+"\n\n"
                     print("After 3 Sigma:\n")
+                    
                     y_data[i], y_pred = self.set_3SigmaStats(obs_y=y_data[i],pred_y=y_pred)
-                    text,(_,_,_) = self.calc_RegressionStatistics(obs_y=y_data[i],pred_y=y_pred)
+                    text,(_,_,_),df_3S = self.calc_RegressionStatistics(obs_y=y_data[i],pred_y=y_pred)
+                    
                     print(text,end="\n\n")
                     texts += "After 3 Sigma:\n"+text+"\n\n"
+                    df = pd.concat([df,df_3S],axis=1)
                 elif self.model_type == self.Classification:
                     
                     y_pred = (model.predict_proba(X_data[i])[:,1] >= 0.5).astype(bool)
                     prediction_df = pd.DataFrame({'y': y_data[i], 'pred': y_pred})
                     confusion, (TP, TN, FP, FN) = self.calc_confusion_matrix(prediction_df)
-                    text,_  =  self.calc_Statistics(TP, TN, FP, FN, prediction_df)
+                    text,_,df =  self.calc_Statistics(TP, TN, FP, FN, prediction_df)
                     
                     print(text)
                     texts += text
+
                     self.plot_Classification(confusion,[['T','F'],["P","N"]],title='Test set')
 
         else:
             raise Exception("X and y data must be equal in length")
-        return texts
+        return texts,df
     
-class Model_Generator():
-        def __init__(self):
-            pass
-        LGBM = GLOBALS.LGBM
-        RF = GLOBALS.RF
-        SVM = GLOBALS.SVM
+class Models():
+
+    def __init__(self):
+        pass
+    KEY_WORDS = GLOBALS
+    AVAILABLE_MODELS = KEY_WORDS.AVAILABLE_MODELS
+    CLASS = KEY_WORDS.CLASSIFIER
+    PARAMS = KEY_WORDS.PARAMS
+    LGBM = AVAILABLE_MODELS[0]
+    RF = AVAILABLE_MODELS[1]
+    SVM = AVAILABLE_MODELS[2]
+    KMEANS = AVAILABLE_MODELS[3]
+    GAUSSIAN_MIX = AVAILABLE_MODELS[4]
+    DB_SCAN = AVAILABLE_MODELS[5]
+    OPTICS = AVAILABLE_MODELS[6]
+    AGG_CLUSTER = AVAILABLE_MODELS[7]
+    AFFINITY_PROP = AVAILABLE_MODELS[8]
+    BIRCH = AVAILABLE_MODELS[9]
+    
+    def get_Model(self,model_name:str):
+        if model_name is None:
+            raise Exception("Please provide a model name")
+        models = [(i,model.lower()) for i,model in enumerate(self.AVAILABLE_MODELS)]
+        for i,model in models:
+            if model == model_name.lower():
+                return self.AVAILABLE_MODELS[i]
+            if i == len(models)-1:
+                raise Exception("Model not found")
+    
+class Model_Generator(Models):
+    """
+    Class with dictionaries to input in BayesSearchcv
+    Helper methods to get desired model with minimum difficulty
+
+    Each model contains neccessary params to input in a Bayesean Search
+    """
+    def __init__(self):
+        super().__init__()
+    
+    def set_Model(self, model_name: str) -> dict:
         Models: dict = {
-        "LGBM":{
-            "classifier":lgb.LGBMClassifier(),                   
-            "params":{
+
+        #Machine Learning Models
+        self.LGBM:{
+            self.CLASS:lgb.LGBMClassifier(),                   
+            self.PARAMS:{
                 'learning_rate': (0.01, 0.1, 'uniform'), 
                 'num_leaves': (1, 15),
                 'n_estimators': (2, 50), 
@@ -596,37 +679,153 @@ class Model_Generator():
                 'subsample': (0.1, 0.3), 
             },
         },
-        "RF":{
-            "classifier":RandomForestClassifier(),
-            "params":{
+        self.RF:{
+            self.CLASS:RandomForestClassifier(),
+            self.PARAMS:{
             'max_features': ['auto', 'sqrt'],
             'n_estimators': [2, 150],
             "max_depth": [2, 10],
             },
         },
-        "SVM":{
-            "classifier":SVC(),
-            "params":{
+        self.SVM:{
+            self.CLASS:SVC(),
+            self.PARAMS:{
                 'C': (1e-7, 1e-1, 'uniform'),
                 #'gamma': (0.01, 1.0, 'log-uniform'),
                 'degree': (1, 8),
                 'kernel': ['linear', 'poly', 'rbf', 'sigmoid'],
             },
         },
-        "Dense":T.keras.models.Sequential([
-            T.keras.layers.Dense(64,activation="relu"),
-            T.keras.layers.Dense(64,activation="relu"),
-            T.keras.layers.Dense(1,activation="sigmoid")
-        ]),
-        "CNN":T.keras.models.Sequential([
-            T.keras.layers.Conv1D(64,3,activation="relu"),
-            T.keras.layers.MaxPooling1D(3),
-            T.keras.layers.Conv1D(64,3,activation="relu"),
-            T.keras.layers.MaxPooling1D(3),
-            T.keras.layers.Conv1D(64,3,activation="relu"),
-            T.keras.layers.GlobalMaxPooling1D(),
-            T.keras.layers.Dense(64,activation="relu"),
-            T.keras.layers.Dense(1,activation="sigmoid")
-        ]),
+
+        #CLUSTERING ALGORITHMS
+        self.KMEANS:{
+            self.CLASS:KMeans(),
+            self.PARAMS:{
+                "n_clusters":[1,100],
+                "tol":[1e-6,1e-2],
+                "algorithm":["lloyd", "elkan", "auto", "full"]
+            }        
+        },
+        self.DB_SCAN:{
+            self.CLASS:DBSCAN(),
+            self.PARAMS:{
+                "eps":[0.1,1.0],
+                "min_samples":[1,10],
+                "metric":["cityblock", "cosine", "euclidean", "l1", "l2", "manhattan"],
+                "algorithm":["auto", "ball_tree", "kd_tree", "brute"],
+                "leaf_size":[5,100],
+            }
+        },
+        self.AGG_CLUSTER:{
+            self.CLASS:AgglomerativeClustering(),
+            self.PARAMS:{
+                "n_clusters":[1,100],
+                "linkage":["ward", "complete", "average", "single"],
+                "metric":["cityblock", "cosine", "euclidean", "l1", "l2", "manhattan"],
+            }
+        },
+        self.AFFINITY_PROP:{
+            self.CLASS:AffinityPropagation(),
+            self.PARAMS:{
+                "damping":[0.5,1.0],
+                "max_iter":[100,1000],
+                "convergence":[15],
+                "affinity":["euclidean", "precomputed"],
+            }
+        },
+        self.BIRCH:{
+            self.CLASS:Birch(),
+            self.PARAMS:{
+                "threshold":[0.1,1.0],
+                "branching_factor":[10,200],
+                "n_clusters":[1,100],
+            }
+        },
+        self.GAUSSIAN_MIX:{
+            self.CLASS:GaussianMixture(),
+            self.PARAMS:{
+                "n_components":[1,10],
+                "covariance_type":["full", "tied", "diag", "spherical"],
+                "tol":[1e-6,1e-1],
+                "reg_covar":[1e-6,1e-1],
+                "max_iter":[100,1000],
+                "n_init":[1,10],
+                "init_params":["kmeans", "random"],
+            }
+        },
+        self.OPTICS:{
+            self.CLASS:OPTICS(),
+            self.PARAMS:{
+                "min_samples":[1,10],
+                "max_eps":[0.1,1.0],
+                "metric":["cityblock", "cosine", "euclidean", "l1", "l2", "manhattan"],
+                "algorithm":["auto", "ball_tree", "kd_tree", "brute"],
+                "leaf_size":[5,100],
+                "cluster_method":["xi", "dbscan"]
+            }
+        },
     }
-        
+        return Models[model_name]
+    
+    def get_AvailableModels(self) -> List[str]:
+        print("Available Models: " + str(self.AVAILABLE_MODELS))
+        return self.AVAILABLE_MODELS
+    
+    def get_Model(self, model_name: str):
+        return super().get_Model(model_name)
+
+    def get_buildParams(self,model_name:str) -> Tuple[object,dict]:
+        """
+        Returns the model and its params respectively, if available 
+        """
+        model = self.get_Model(model_name)
+        return self.set_Model(model)[self.CLASS],self.set_Model(model)[self.PARAMS]     
+
+class BayesSearch_Helper(Model_Generator,ML_Helper):
+    """
+    Class with helper methods to run BayesSearchCV on models contained in Model_Generator
+    """
+
+    def  __init__(self):
+        super().__init__()
+    
+    def get_BestParams(self,model_name:str,X:np.ndarray,y:np.ndarray) -> Tuple[dict,float]:
+        """
+        Builds a BayesSearchCV object with the model and its params
+        """
+        cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=3, random_state=1)
+        scorer = make_scorer(mean_squared_error)
+        model,params = self.get_buildParams(model_name)
+        clf = BayesSearchCV(
+            estimator=model,
+            search_spaces=params,
+            cv=cv,
+            n_jobs=-1,
+            n_iter=2,
+            verbose=0,
+            refit=True,
+            scoring = scorer,
+            random_state=42
+        )
+        clf.fit(X,y)
+        return clf.best_params_,clf.best_score_
+    
+    def build(self,model_name,params,x_data,y_data):
+        """
+        Builds a model with the best parameters found by BayesSearchCV
+        """
+        model,_ = self.get_buildParams(model_name)
+        model = model.set_params(**params)
+        model.fit(x_data,y_data)
+        return model
+    
+    def get_Stats(self,model_name:str,X:np.ndarray,y:np.ndarray) -> Tuple[BayesSearchCV,dict]:
+        """
+        Returns the best parameters and the best score of the model
+        """
+        best,_ = self.get_BestParams(model_name,X,y)
+        model = self.build(model_name,best,X,y)
+        text,df = self.get_ML_StatsForNSplits(model,X_data=X,y_data=y)
+        return text,df
+
+

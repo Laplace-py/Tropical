@@ -1,5 +1,135 @@
 class Model_Generator():#(TS_Helper):
-#         Models = {
+# def load_file_list(path:str,global_tasks:int,smiles_col:str,task_start:int,local_num_tasks:int,wich_split:str,fold:int):
+    """
+    Loads the x_data,y_data,smiles for (Train or Test or Validation) and  returns a generator with the data, to access the data use next(generator), or a for loop
+    
+    Data is returned in the following order: x_data, y_data, smiles
+    
+    path: is the path to the folder where the files are located, use relative path
+    global_tasks: is the number of tasks you want to iterate over, considering that each task is in a different file
+    smiles_col: is the name of the column that contains the smiles
+    task_start: is the column where the tasks start
+    local_num_tasks: is the number of tasks in each file
+    wich_split: is the type of split you want to load, train, val or test, 
+    FOLD: is the fold you want to load, considering that FOLD is in the name of the file
+    """
+    data = [path+"/"+train for train in os.listdir(path) if train.find(wich_split)!=-1 and train.   (str(fold))!=-1 and train.endswith(".csv")]
+    for task in range(global_tasks):
+        yield commons.load_dataset(data[task],smiles_col,task_start,local_num_tasks)
+
+def assign_fingerprints(smiles:list[str],fp_size:int,radius:int,feat:bool):
+    """
+    returns fingerprints for the given smiles
+    smiles: is a list of smiles
+    fp_size: is the size of the bit string
+    radius: is the radius of the circular fingerprint
+    feat: is a boolean that indicates if you want to consider pharmacophoric features
+    """
+    return commons.assing_fp(smiles,fp_size,radius,feat)
+
+def assignXY(fp_size:int,radius:int,feat:bool,path:str,global_tasks:int,smiles_col:str,task_start:int,local_num_tasks:int,wich_split:str,fold:int):
+    """
+    returns a generator with the {x_data,y_data} of the given split (train, val or test) to access the data use next(generator), or a for loop
+    - x_data (Fingerprint values),
+    - y_data (nd.array with integer values),
+    fp_size: is the size of the bit string
+    radius: is the radius of the circular fingerprint
+    feat: is a boolean that indicates if you want to consider pharmacophoric features
+    path: is the path to the folder where the files are located, use relative path
+    tasks: is the number of tasks you want to iterate over, considering that each task is in a different file
+    Wich_split: is the type of split you want to load, train, val or test,
+    FOLD: is the fold you want to load, considering that FOLD is in the name of the file
+    """
+    for _,y_data,smiles in load_file_list(path,global_tasks,smiles_col,task_start,local_num_tasks,wich_split,fold):
+        y_data = y_data.ravel()
+        y_data = np.array(y_data).astype(int)
+        yield assign_fingerprints(smiles,fp_size,radius,feat),y_data
+        
+def build_model(X_data,y_data,selected_model,use_default_params:bool=True):
+    """
+    returns a model with the best parameters found using bayesian optimization
+    X_data: is the x_data
+    y_data: is the y_data
+    """
+    build_model = model_generator.Models[SELECTED_MODEL]
+    CLASSIFIER = build_model["classifier"]
+    PARAMS = build_model["params"]
+    if use_default_params:
+        lgbm_best_params = {'learning_rate': 0.04690935629679825, 'max_depth': 8, 'n_estimators': 47, 'num_leaves': 5, 'subsample': 0.23402958965378692}
+        rf_best_params = {'max_depth': 5, 'max_features': 'sqrt', 'n_estimators': 140}
+        svm_best_params = {'C': 0.0410104548749355, 'degree': 6, 'kernel': 'sigmoid'}
+    else:
+        cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=3, random_state=1)
+        scorer = make_scorer(mean_squared_error)
+        best_model = BayesSearchCV(CLASSIFIER,
+            PARAMS,
+            n_iter=1, # Number of parameter settings that are sampled
+            cv=cv,
+            scoring = scorer,
+            refit = True, # Refit the best estimator with the entire dataset.
+            random_state=42,
+            n_jobs = -1
+        )
+        best_model.fit(X_data, y_data)
+        best_params = best_model.best_params_
+    
+    #setModelParams = lambda selected_model,use_default_params: rf_best_params if selected_model == model_generator.RF and use_default_params else best_params or lgbm_best_params if selected_model == model_generator.LGBM and use_default_params else best_params or svm_best_params if selected_model == model_generator.SVM and use_default_params else best_params
+    if selected_model == model_generator.RF and use_default_params:
+            params = rf_best_params
+    elif selected_model == model_generator.LGBM and use_default_params:
+            params = lgbm_best_params
+    elif selected_model == model_generator.SVM and use_default_params:
+            params = svm_best_params
+    elif not use_default_params:
+            params = best_params
+    if selected_model not in model_generator.Models.keys():
+           raise "Not implemented yet"
+    model = CLASSIFIER.set_params(**params)
+    model.fit(X_data,y_data)
+    return model
+
+def buildThenFitThenGetStats(fp_size:int,radius:int,feat:bool,path:str,global_tasks:int,smiles_col:str,task_start:int,local_num_tasks:int,which_splits:list[str],fold,selected_model,useDefaultParams:bool=True)->tuple[pd.DataFrame,str]:
+    """
+    Returns a generator with the stats in a Dataframe of the model for each given split (train, val or test)
+    
+    To access the data use next(generator), or a for loop
+    Data is returned in the following order: dataframe:pd.Dataframe, split:str
+    
+    fp_size: is the size of the bit string
+    
+    radius: is the radius of the circular fingerprint
+    
+    feat: is a boolean that indicates if you want to consider pharmacophoric features
+    
+    path: is the path to the folder where the files are located, use relative path
+    
+    global_tasks: is the number of tasks you want to iterate over, considering that each task is in a different file
+    
+    smiles_col: is the name of the column that contains the smiles
+    
+    task_start: is the column where the tasks start
+    
+    local_num_tasks: is the number of tasks in each file
+    
+    wich_split: is the type of split you want to load, train, val or test, 
+    
+    fold: is the fold you want to load, considering that FOLD is in the name of the file
+    
+    useDefaultParams: is a boolean that indicates if you want to use the default parameters or the best parameters found using bayesian optimization
+    """
+    """for split in which_splits:
+         for x_data,y_data in assignXY(fp_size,radius,feat,path,global_tasks,smiles_col,task_start,local_num_tasks,split,fold):
+            model = build_model(x_data,y_data,selected_model,useDefaultParams)
+            text,df = ml_helper.get_ML_StatsForNSplits(model,X_train=x_data,y_train=y_data)
+            print(text)
+            df["split"] = split
+            split_type = "Random"
+            df["Model_type"] = selected_model
+            df["Tasks"] = str(global_tasks)
+            yield df,split"""
+
+        
+# Models = {
 #         "Dense":T.keras.models.Sequential([
 #             T.keras.layers.Dense(64,activation="relu"),
 #             T.keras.layers.Dense(64,activation="relu"),
@@ -106,6 +236,22 @@ class Model_Generator():#(TS_Helper):
         def __init__(self,):
                 super().__init__()
 
+def eufrasiaMLBestModels(SELECTED_MODEL,CLASSIFIER,rf_best_params,lgbm_best_params,svm_best_params,model_generator):
+
+        if SELECTED_MODEL == model_generator.RF:
+                model = CLASSIFIER.set_params(**rf_best_params)
+        #model = best_model.best_estimator_
+        if SELECTED_MODEL == model_generator.LGBM:
+                model = CLASSIFIER.set_params(**lgbm_best_params)
+        #model = best_model.best_estimator_
+
+        if SELECTED_MODEL == model_generator.SVM:
+                model = CLASSIFIER.set_params(**svm_best_params)
+                #model = best_model.best_estimator_
+        else:
+                lgbm_best_params = {'learning_rate': 0.04690935629679825, 'max_depth': 8, 'n_estimators': 47, 'num_leaves': 5, 'subsample': 0.23402958965378692}
+                rf_best_params = {'max_depth': 5, 'max_features': 'sqrt', 'n_estimators': 140}
+                svm_best_params = {'C': 0.0410104548749355, 'degree': 6, 'kernel': 'sigmoid'}
           
 def get_RegressionStatsFor_Train_Test_Validation(self,model,X_train,y_train,X_test,y_test,X_val,y_val,task:int) :#-> Tuple[str,tuple[float,float,float]]:
         regression_prediction_train = pd.DataFrame(data={"pred":model.predict(X_train)[:,task],"y":y_train[:,task]},index=range(len(y_train)))

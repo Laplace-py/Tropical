@@ -1,4 +1,4 @@
-final-220-NEW-1 Fold 4:
+final-220-NEW-1 Fold 0:
  Before 3 Sigma:
 Statistic         Value
 -----------  ----------
@@ -26,5 +26,440 @@ Statistic        Value
 MSE           2.59119
 MAE           1.4717
 R2           -0.137548
+
+final-CHEMBL2056 Fold 0:
+ Before 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.50893
+MAE           0.917092
+R2           -0.0741306
+
+After 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.78234
+MAE           1.26078
+R2           -0.0644648
+
+Before 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.0101
+MAE           0.767677
+R2           -0.0421053
+
+After 3 Sigma:
+Statistic           Value
+-----------  ------------
+MSE           1
+MAE           1
+R2           -0.000330688
+
+final-CHEMBL2093864 Fold 0:
+ Before 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           3.72299
+MAE           1.26316
+R2           -0.522289
+
+After 3 Sigma:
+Statistic       Value
+-----------  --------
+MSE           4.86935
+MAE           1.91457
+R2           -1.35326
+
+Before 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           2.28261
+MAE           1.06522
+R2           -0.620262
+
+After 3 Sigma:
+Statistic       Value
+-----------  --------
+MSE           2.60714
+MAE           1.46429
+R2           -1.49573
+
+final-CHEMBL211 Fold 0:
+ Before 3 Sigma:
+Statistic       Value
+-----------  --------
+MSE           2.55649
+MAE           1.2471
+R2           -0.11328
+
+After 3 Sigma:
+Statistic       Value
+-----------  --------
+MSE           3.07439
+MAE           1.59227
+R2           -0.1295
+
+Before 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           2.2521
+MAE           1.07563
+R2           -0.0710639
+
+After 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           2.77632
+MAE           1.51316
+R2           -0.0728574
+
+final-CHEMBL217 Fold 0:
+ Before 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.22988
+MAE           0.795802
+R2           -0.0718564
+
+After 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.65872
+MAE           1.21957
+R2           -0.0933683
+
+Before 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           1.35016
+MAE           0.838762
+R2           -0.104027
+
+After 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           1.68333
+MAE           1.22778
+R2           -0.140622
+
+final-CHEMBL253 Fold 0:
+ Before 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE          1.24342
+MAE          0.822368
+R2           0.0616443
+
+After 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.68735
+MAE           1.22912
+R2           -0.0142493
+
+Before 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.25146
+MAE           0.830409
+R2           -0.0622274
+
+After 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           1.75701
+MAE           1.25234
+R2           -0.235702
+
+final-CHEMBL4079 Fold 0:
+ Before 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           2.04219
+MAE           1.03797
+R2           -0.228242
+
+After 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           1.75591
+MAE           1.25197
+R2           -0.140137
+
+Before 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           1.86667
+MAE           1
+R2           -0.404682
+
+After 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           1.70588
+MAE           1.23529
+R2           -0.521605
+
+final-NMDA-1 Fold 0:
+ Before 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.75989
+MAE           1.02068
+R2           -0.0622086
+
+After 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.91233
+MAE           1.30411
+R2           -0.0400091
+
+Before 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           1.84286
+MAE           1.07143
+R2           -0.062228
+
+After 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           1.82653
+MAE           1.27551
+R2           -0.025788
+
+final-220-NEW-1 Fold 0:
+ Before 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           3.02877
+MAE           1.23548
+R2           -0.0803778
+
+After 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           2.91556
+MAE           1.55447
+R2           -0.0999806
+
+Before 3 Sigma:
+Statistic       Value
+-----------  --------
+MSE           2.78298
+MAE           1.21702
+R2           -0.11725
+
+After 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           2.77341
+MAE           1.51662
+R2           -0.151597
+
+final-CHEMBL2056 Fold 0:
+ Before 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.45791
+MAE           0.899235
+R2           -0.0809149
+
+After 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.74074
+MAE           1.24691
+R2           -0.0775319
+
+Before 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           1.70707
+MAE           1
+R2           -0.089116
+
+After 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           2.07812
+MAE           1.35938
+R2           -0.0792443
+
+final-CHEMBL2093864 Fold 0:
+ Before 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           3.91136
+MAE           1.31856
+R2           -0.560971
+
+After 3 Sigma:
+Statistic       Value
+-----------  --------
+MSE           5.05854
+MAE           1.9561
+R2           -1.4164
+
+Before 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           2.76087
+MAE           1.06522
+R2           -0.306059
+
+After 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           2.34783
+MAE           1.3913
+R2           -0.475059
+
+final-CHEMBL217 Fold 0:
+ Before 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.23334
+MAE           0.800082
+R2           -0.0767948
+
+After 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           1.66655
+MAE           1.22218
+R2           -0.105104
+
+Before 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           1.22801
+MAE           0.80456
+R2           -0.071707
+
+After 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.67213
+MAE           1.22404
+R2           -0.0900066
+
+final-CHEMBL218 Fold 0:
+ Before 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.4845
+MAE           0.924419
+R2           -0.0177176
+
+After 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE          1.67111
+MAE          1.2237
+R2           0.00235849
+
+Before 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.4031
+MAE           0.891473
+R2           -0.0269955
+
+After 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.6506
+MAE           1.21687
+R2           -0.0185417
+
+final-CHEMBL253 Fold 0:
+ Before 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE          1.24635
+MAE          0.826754
+R2           0.0472304
+
+After 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.69408
+MAE           1.23136
+R2           -0.0200555
+
+Before 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE          1.03801
+MAE          0.75731
+R2           0.0997064
+
+After 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE          1.5545
+MAE          1.18483
+R2           0.00227777
+
+final-CHEMBL4079 Fold 0:
+ Before 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           1.92405
+MAE           1.01266
+R2           -0.229376
+
+After 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           1.81818
+MAE           1.27273
+R2           -0.182972
+
+Before 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           2.43333
+MAE           1.16667
+R2           -0.318483
+
+After 3 Sigma:
+Statistic        Value
+-----------  ---------
+MSE           3.47619
+MAE           1.66667
+R2           -0.526892
+
+final-NMDA-1 Fold 0:
+ Before 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.75719
+MAE           1.02518
+R2           -0.0561916
+
+After 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.90934
+MAE           1.30311
+R2           -0.0346997
+
+Before 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.87857
+MAE           1.03571
+R2           -0.0825909
+
+After 3 Sigma:
+Statistic         Value
+-----------  ----------
+MSE           1.88636
+MAE           1.29545
+R2           -0.0342679
 
 

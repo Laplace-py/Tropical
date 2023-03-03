@@ -61,9 +61,9 @@ class DataSplitter():
         """
         for i in range(n_folds):
             if split_type == self.Random_split:
-                yield self.random_split(dataset, sizes, seed),i, seed
+                yield self.random_split(dataset, sizes, seed),i
             elif split_type == self.Scaffold_split:
-                yield self.scaffold_split(dataset, sizes, seed),i, seed
+                yield self.scaffold_split(dataset, sizes, seed),i
     
     def merge_data(self,dataset:str, train_df:pd.DataFrame, valid_df:pd.DataFrame, test_df:pd.DataFrame) -> tuple[pd.DataFrame,pd.DataFrame,pd.DataFrame]:
         
